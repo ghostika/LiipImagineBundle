@@ -2,14 +2,12 @@
 
 namespace Liip\ImagineBundle\Imagine\Filter;
 
-use Imagine\Image\ImageInterface;
 use Imagine\Image\ImagineInterface;
 use Liip\ImagineBundle\Binary\BinaryInterface;
+use Liip\ImagineBundle\Binary\MimeTypeGuesserInterface;
+use Liip\ImagineBundle\Imagine\Filter\PostProcessor\PostProcessorInterface;
 use Liip\ImagineBundle\Imagine\Filter\Loader\LoaderInterface;
-
 use Liip\ImagineBundle\Model\Binary;
-use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
 
 class FilterManager
 {
@@ -24,18 +22,33 @@ class FilterManager
     protected $imagine;
 
     /**
+     * @var MimeTypeGuesserInterface
+     */
+    protected $mimeTypeGuesser;
+
+    /**
      * @var LoaderInterface[]
      */
     protected $loaders = array();
 
     /**
-     * @param FilterConfiguration $filterConfig
-     * @param ImagineInterface    $imagine
+     * @var PostProcessorInterface[]
      */
-    public function __construct(FilterConfiguration $filterConfig, ImagineInterface $imagine)
-    {
+    protected $postProcessors = array();
+
+    /**
+     * @param FilterConfiguration      $filterConfig
+     * @param ImagineInterface         $imagine
+     * @param MimeTypeGuesserInterface $mimeTypeGuesser
+     */
+    public function __construct(
+        FilterConfiguration $filterConfig,
+        ImagineInterface $imagine,
+        MimeTypeGuesserInterface $mimeTypeGuesser
+    ) {
         $this->filterConfig = $filterConfig;
         $this->imagine = $imagine;
+        $this->mimeTypeGuesser = $mimeTypeGuesser;
     }
 
     /**
@@ -49,6 +62,19 @@ class FilterManager
     public function addLoader($filter, LoaderInterface $loader)
     {
         $this->loaders[$filter] = $loader;
+    }
+
+    /**
+     * Adds a post-processor to handle binaries
+     *
+     * @param string $name
+     * @param PostProcessorInterface $postProcessor
+     *
+     * @return void
+     */
+    public function addPostProcessor($name, PostProcessorInterface $postProcessor)
+    {
+        $this->postProcessors[$name] = $postProcessor;
     }
 
     /**
@@ -72,7 +98,8 @@ class FilterManager
         $config = array_replace(
             array(
                 'filters' => array(),
-                'quality' => 100
+                'quality' => 100,
+                'animated' => false
             ),
             $config
         );
@@ -89,11 +116,42 @@ class FilterManager
             $image = $this->loaders[$eachFilter]->load($image, $eachOptions);
         }
 
-        $filteredContent = $image->get($binary->getFormat(), array(
+        $options = array(
             'quality' => $config['quality']
-        ));
+        );
 
-        return new Binary($filteredContent, $binary->getMimeType(), $binary->getFormat());
+        if ($binary->getFormat() === 'gif' && $config['animated']) {
+            $options['animated'] = $config['animated'];
+        }
+
+        $filteredFormat = isset($config['format']) ? $config['format'] : $binary->getFormat();
+        $filteredContent = $image->get($filteredFormat, $options);
+        $filteredMimeType = $filteredFormat === $binary->getFormat() ? $binary->getMimeType() : $this->mimeTypeGuesser->guess($filteredContent);
+
+        return $this->applyPostProcessors(new Binary($filteredContent, $filteredMimeType, $filteredFormat), $config);
+    }
+
+    /**
+     * @param BinaryInterface $binary
+     * @param array           $config
+     *
+     * @throws \InvalidArgumentException
+     *
+     * @return BinaryInterface
+     */
+    public function applyPostProcessors(BinaryInterface $binary, $config)
+    {
+        $config += array('post_processors' => array());
+        foreach ($config['post_processors'] as $postProcessorName => $postProcessorOptions) {
+            if (!isset($this->postProcessors[$postProcessorName])) {
+                throw new \InvalidArgumentException(sprintf(
+                    'Could not find post processor "%s"', $postProcessorName
+                ));
+            }
+            $binary = $this->postProcessors[$postProcessorName]->process($binary);
+        }
+
+        return $binary;
     }
 
     /**

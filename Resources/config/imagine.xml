@@ -11,15 +11,12 @@
         <parameter key="liip_imagine.filter.manager.class">Liip\ImagineBundle\Imagine\Filter\FilterManager</parameter>
         <parameter key="liip_imagine.data.manager.class">Liip\ImagineBundle\Imagine\Data\DataManager</parameter>
         <parameter key="liip_imagine.cache.manager.class">Liip\ImagineBundle\Imagine\Cache\CacheManager</parameter>
+        <parameter key="liip_imagine.cache.signer.class">Liip\ImagineBundle\Imagine\Cache\Signer</parameter>
         <parameter key="liip_imagine.binary.mime_type_guesser.class">Liip\ImagineBundle\Binary\SimpleMimeTypeGuesser</parameter>
 
         <!-- Controller class -->
 
         <parameter key="liip_imagine.controller.class">Liip\ImagineBundle\Controller\ImagineController</parameter>
-
-        <!-- Route loader class -->
-
-        <parameter key="liip_imagine.routing.loader.class">Liip\ImagineBundle\Routing\ImagineLoader</parameter>
 
         <!-- Templating classes -->
 
@@ -62,15 +59,26 @@
 
         <parameter key="liip_imagine.form.type.image.class">Liip\ImagineBundle\Form\Type\ImageType</parameter>
 
+        <parameter key="liip_imagine.meta_data.reader.class">Imagine\Image\Metadata\ExifMetadataReader</parameter>
+
+        <!-- Form types -->
+
+        <parameter key="liip_imagine.form.type.image.class">Liip\ImagineBundle\Form\Type\ImageType</parameter>
+
+        <!-- Post processors' classes -->
+        <parameter key="liip_imagine.filter.post_processor.jpegoptim.class">Liip\ImagineBundle\Imagine\Filter\PostProcessor\JpegOptimPostProcessor</parameter>
+
+        <parameter key="liip_imagine.jpegoptim.binary">/usr/bin/jpegoptim</parameter>
+
     </parameters>
 
     <services>
-
         <!-- Utility services -->
 
         <service id="liip_imagine.filter.manager" class="%liip_imagine.filter.manager.class%">
             <argument type="service" id="liip_imagine.filter.configuration" />
             <argument type="service" id="liip_imagine" />
+            <argument type="service" id="liip_imagine.binary.mime_type_guesser" />
         </service>
 
         <service id="liip_imagine.data.manager" class="%liip_imagine.data.manager.class%">
@@ -78,12 +86,13 @@
             <argument type="service" id="liip_imagine.extension_guesser" />
             <argument type="service" id="liip_imagine.filter.configuration" />
             <argument>%liip_imagine.binary.loader.default%</argument>
+            <argument>%liip_imagine.default_image%</argument>
         </service>
 
         <service id="liip_imagine.cache.manager" class="%liip_imagine.cache.manager.class%">
             <argument type="service" id="liip_imagine.filter.configuration" />
             <argument type="service" id="router" />
-            <argument type="service" id="liip_imagine.uri_signer" />
+            <argument type="service" id="liip_imagine.cache.signer" />
             <argument type="service" id="event_dispatcher" />
             <argument>%liip_imagine.cache.resolver.default%</argument>
         </service>
@@ -98,17 +107,10 @@
             <argument type="service" id="liip_imagine.data.manager" />
             <argument type="service" id="liip_imagine.filter.manager" />
             <argument type="service" id="liip_imagine.cache.manager" />
-            <argument type="service" id="liip_imagine.uri_signer" />
+            <argument type="service" id="liip_imagine.cache.signer" />
         </service>
 
-        <!-- Route Loader -->
-
-        <service id="liip_imagine.routing.loader" class="%liip_imagine.routing.loader.class%">
-            <tag name="routing.loader" />
-            <argument type="service" id="liip_imagine.filter.configuration" />
-            <argument>%liip_imagine.controller_action%</argument>
-            <argument>%liip_imagine.cache_prefix%</argument>
-        </service>
+        <service id="liip_imagine.meta_data.reader" class="%liip_imagine.meta_data.reader.class%" public="false" />
 
         <!-- ImagineInterface instances -->
 
@@ -206,6 +208,7 @@
             <argument><!-- will be injected by AwsS3ResolverFactory --></argument>
             <argument><!-- will be injected by AwsS3ResolverFactory --></argument>
             <argument><!-- will be injected by AwsS3ResolverFactory --></argument>
+            <argument><!-- will be injected by AwsS3ResolverFactory --></argument>
         </service>
 
         <service id="liip_imagine.cache.resolver.prototype.cache" class="%liip_imagine.cache.resolver.cache.class%" public="true" abstract="true">
@@ -249,6 +252,14 @@
             <argument type="service" id="liip_imagine.mime_type_guesser" />
         </service>
 
-        <service id="liip_imagine.uri_signer" alias="uri_signer" />
+        <service id="liip_imagine.cache.signer" class="%liip_imagine.cache.signer.class%">
+            <argument>%kernel.secret%</argument>
+        </service>
+
+        <!-- Post processors -->
+        <service id="liip_imagine.filter.post_processor.jpegoptim" class="%liip_imagine.filter.post_processor.jpegoptim.class%">
+            <argument>%liip_imagine.jpegoptim.binary%</argument>
+            <tag name="liip_imagine.filter.post_processor" post_processor="jpegoptim" />
+        </service>
     </services>
 </container>

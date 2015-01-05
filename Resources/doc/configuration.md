@@ -8,31 +8,40 @@ liip_imagine:
     resolvers:
         default:
             web_path:
-              web_root: ~ # %kernel.root_dir%../web
+              web_root: ~ # %kernel.root_dir%/../web
               cache_prefix: ~ # media/cache
 
 
     loaders:
         default:
             filesystem:
-                data_root: ~  # %kernel.root_dir%../web/
+                data_root: ~  # %kernel.root_dir%/../web/
 
     driver:               gd
     cache:                default
     data_loader:          default
-    controller_action:    liip_imagine.controller:filterAction
+    default_image:        null
+    controller:
+        filter_action:         liip_imagine.controller:filterAction
+        filter_runtime_action: liip_imagine.controller:filterRuntimeAction
     filter_sets:
 
         # Prototype
         name:
             path:                 ~
             quality:              100
+            animated:             false
             format:               ~
             cache:                ~
             data_loader:          ~
-            controller_action:    ~
-            route:                []
+            default_image:        null
+            controller:           ~
             filters:
+
+                # Prototype
+                name:                 []
+
+            post_processors:
 
                 # Prototype
                 name:                 []
@@ -48,15 +57,18 @@ There are several configuration options available:
 
     default: filesystem (which means the standard filesystem loader is used)
 
- - `controller_action` - name of the controller action to use in the route loader
+ - `controller`
+         - `filter_action` - name of the controller action to use in the route loader
 
-    default: liip_imagine.controller:filterAction
+            default: liip_imagine.controller:filterAction
+
+        - `filter_runtime_action` - name of the controller action to use in the route loader for runtimeconfig images
+
+            default: liip_imagine.controller:filterRuntimeAction
 
  - `driver` - one of the three drivers: `gd`, `imagick`, `gmagick`
 
     default: `gd`
-
- - `formats` - optional list of image formats to which images may be converted to.
 
  - `filter_sets` - specify the filter sets that you want to define and use
 
@@ -64,15 +76,19 @@ Each filter set that you specify has the following options:
 
  - `filters` - determine the type of filter to be used (refer to *Filters* section for more information)
     and options that should be passed to the specific filter type
+ - `post_processors` - sets post-processors to be applied on filtered image (see [Post-Processors](filters.md#post-processors) for details)
  - `path` - used in place of the filter name to determine the path in combination with the global `cache_prefix`
  - `quality` - override the default quality of 100 for the generated images
  - `cache` - override the default cache setting
  - `data_loader` - override the default data loader
- - `controller_action` - override the default controller action
+ - `controller`
+    - `filter_action` - override the default controller action
+    - `filter_runtime_action` - override the default controller action for runtime config
  - `route` - optional list of route requirements, defaults and options using in the route loader. Add array with keys 'requirements', 'defaults' or 'options'.
 
     default: empty array
 
  - `format` - hardcodes the output format (aka the requested format is ignored)
+ - `animated` - support for resizing animated gif (currently not supported by Imagine (PR pending))
 
 [Back to the index](index.md)

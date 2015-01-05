@@ -4,7 +4,6 @@ namespace Liip\ImagineBundle\Tests\Imagine\Cache\Resolver;
 
 use Liip\ImagineBundle\Imagine\Cache\Resolver\WebPathResolver;
 use Liip\ImagineBundle\Model\Binary;
-use Liip\ImagineBundle\Tests\AbstractTest;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Routing\RequestContext;
 
@@ -93,7 +92,7 @@ class WebPathResolverTest extends \PHPUnit_Framework_TestCase
         $this->assertAttributeSame('aCache/Prefix', 'cachePrefix', $resolver);
     }
 
-    public function testReturnTrueIfFileExistsOnIsStore()
+    public function testReturnTrueIfFileExistsOnIsStored()
     {
         $filesystemMock = $this->createFilesystemMock();
         $filesystemMock
@@ -113,7 +112,7 @@ class WebPathResolverTest extends \PHPUnit_Framework_TestCase
         $this->assertTrue($resolver->isStored('aPath', 'aFilter'));
     }
 
-    public function testReturnFalseIfFileNotExistsOnIsStore()
+    public function testReturnFalseIfFileNotExistsOnIsStored()
     {
         $filesystemMock = $this->createFilesystemMock();
         $filesystemMock
@@ -137,7 +136,7 @@ class WebPathResolverTest extends \PHPUnit_Framework_TestCase
     {
         $requestContext = new RequestContext;
         $requestContext->setScheme('theSchema');
-        $requestContext->setHost('theHost');
+        $requestContext->setHost('thehost');
 
         $resolver = new WebPathResolver(
             $this->createFilesystemMock(),
@@ -147,7 +146,7 @@ class WebPathResolverTest extends \PHPUnit_Framework_TestCase
         );
 
         $this->assertEquals(
-            'theschema://theHost/aCachePrefix/aFilter/aPath',
+            'theschema://thehost/aCachePrefix/aFilter/aPath',
             $resolver->resolve('aPath', 'aFilter')
         );
     }
@@ -156,7 +155,7 @@ class WebPathResolverTest extends \PHPUnit_Framework_TestCase
     {
         $requestContext = new RequestContext;
         $requestContext->setScheme('theSchema');
-        $requestContext->setHost('theHost');
+        $requestContext->setHost('thehost');
         $requestContext->setBaseUrl('/theBasePath/app.php');
 
         $resolver = new WebPathResolver(
@@ -167,7 +166,7 @@ class WebPathResolverTest extends \PHPUnit_Framework_TestCase
         );
 
         $this->assertEquals(
-            'theschema://theHost/theBasePath/aCachePrefix/aFilter/aPath',
+            'theschema://thehost/theBasePath/aCachePrefix/aFilter/aPath',
             $resolver->resolve('aPath', 'aFilter')
         );
     }
@@ -176,7 +175,7 @@ class WebPathResolverTest extends \PHPUnit_Framework_TestCase
     {
         $requestContext = new RequestContext;
         $requestContext->setScheme('theSchema');
-        $requestContext->setHost('theHost');
+        $requestContext->setHost('thehost');
         $requestContext->setBaseUrl('/theBasePath/theSubBasePath');
 
         $resolver = new WebPathResolver(
@@ -187,7 +186,7 @@ class WebPathResolverTest extends \PHPUnit_Framework_TestCase
         );
 
         $this->assertEquals(
-            'theschema://theHost/theBasePath/theSubBasePath/aCachePrefix/aFilter/aPath',
+            'theschema://thehost/theBasePath/theSubBasePath/aCachePrefix/aFilter/aPath',
             $resolver->resolve('aPath', 'aFilter')
         );
     }
@@ -196,7 +195,7 @@ class WebPathResolverTest extends \PHPUnit_Framework_TestCase
     {
         $requestContext = new RequestContext;
         $requestContext->setScheme('theSchema');
-        $requestContext->setHost('theHost');
+        $requestContext->setHost('thehost');
         $requestContext->setBaseUrl('\\');
 
         $resolver = new WebPathResolver(
@@ -207,7 +206,7 @@ class WebPathResolverTest extends \PHPUnit_Framework_TestCase
         );
 
         $this->assertEquals(
-            'theschema://theHost/aCachePrefix/aFilter/aPath',
+            'theschema://thehost/aCachePrefix/aFilter/aPath',
             $resolver->resolve('aPath', 'aFilter')
         );
     }
@@ -216,7 +215,7 @@ class WebPathResolverTest extends \PHPUnit_Framework_TestCase
     {
         $requestContext = new RequestContext;
         $requestContext->setScheme('http');
-        $requestContext->setHost('theHost');
+        $requestContext->setHost('thehost');
         $requestContext->setHttpPort(88);
 
         $resolver = new WebPathResolver(
@@ -227,7 +226,7 @@ class WebPathResolverTest extends \PHPUnit_Framework_TestCase
         );
 
         $this->assertEquals(
-            'http://theHost:88/aCachePrefix/aFilter/aPath',
+            'http://thehost:88/aCachePrefix/aFilter/aPath',
             $resolver->resolve('aPath', 'aFilter')
         );
     }
@@ -236,7 +235,7 @@ class WebPathResolverTest extends \PHPUnit_Framework_TestCase
     {
         $requestContext = new RequestContext;
         $requestContext->setScheme('https');
-        $requestContext->setHost('theHost');
+        $requestContext->setHost('thehost');
         $requestContext->setHttpsPort(444);
 
         $resolver = new WebPathResolver(
@@ -247,7 +246,7 @@ class WebPathResolverTest extends \PHPUnit_Framework_TestCase
         );
 
         $this->assertEquals(
-            'https://theHost:444/aCachePrefix/aFilter/aPath',
+            'https://thehost:444/aCachePrefix/aFilter/aPath',
             $resolver->resolve('aPath', 'aFilter')
         );
     }
@@ -412,6 +411,42 @@ class WebPathResolverTest extends \PHPUnit_Framework_TestCase
         );
 
         $resolver->remove(array(), array('aFilterOne', 'aFilterTwo'));
+    }
+
+    public function testShouldRemoveDoubleSlashInUrl()
+    {
+        $resolver = new WebPathResolver(
+            $this->createFilesystemMock(),
+            new RequestContext,
+            '/aWebRoot',
+            'aCachePrefix'
+        );
+
+        $rc = new \ReflectionClass($resolver);
+        $method = $rc->getMethod('getFileUrl');
+        $method->setAccessible(true);
+
+        $result = $method->invokeArgs($resolver, array('/cats.jpg', 'some_filter'));
+
+        $this->assertEquals('aCachePrefix/some_filter/cats.jpg', $result);
+    }
+
+    public function testShouldSanitizeSeparatorBetweenSchemeAndAuthorityInUrl()
+    {
+        $resolver = new WebPathResolver(
+            $this->createFilesystemMock(),
+            new RequestContext,
+            '/aWebRoot',
+            'aCachePrefix'
+        );
+
+        $rc = new \ReflectionClass($resolver);
+        $method = $rc->getMethod('getFileUrl');
+        $method->setAccessible(true);
+
+        $result = $method->invokeArgs($resolver, array('https://some.meme.com/cute/cats.jpg', 'some_filter'));
+
+        $this->assertEquals('aCachePrefix/some_filter/https---some.meme.com/cute/cats.jpg', $result);
     }
 
     /**

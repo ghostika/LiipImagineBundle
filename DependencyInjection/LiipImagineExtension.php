@@ -8,6 +8,7 @@ use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\Alias;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\XmlFileLoader;
+use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\HttpKernel\DependencyInjection\Extension;
 
 class LiipImagineExtension extends Extension
@@ -39,12 +40,20 @@ class LiipImagineExtension extends Extension
     }
 
     /**
+     * {@inheritdoc}
+     */
+    public function getConfiguration(array $config, ContainerBuilder $container)
+    {
+        return new Configuration($this->resolversFactories, $this->loadersFactories);
+    }
+
+    /**
      * @see Symfony\Component\DependencyInjection\Extension.ExtensionInterface::load()
      */
     public function load(array $configs, ContainerBuilder $container)
     {
         $config = $this->processConfiguration(
-            new Configuration($this->resolversFactories, $this->loadersFactories),
+            $this->getConfiguration($configs, $container),
             $configs
         );
 
@@ -54,16 +63,23 @@ class LiipImagineExtension extends Extension
         $loader = new XmlFileLoader($container, new FileLocator(__DIR__.'/../Resources/config'));
         $loader->load('imagine.xml');
 
+        if (interface_exists('Imagine\Image\Metadata\MetadataReaderInterface')) {
+            $container->getDefinition('liip_imagine.'.$config['driver'])->addMethodCall('setMetadataReader', array(new Reference('liip_imagine.meta_data.reader')));
+        } else {
+            $container->removeDefinition('liip_imagine.meta_data.reader');
+        }
+
         $container->setAlias('liip_imagine', new Alias('liip_imagine.'.$config['driver']));
 
-        $container->setParameter('liip_imagine.cache_prefix', 'media/cache');
         $container->setParameter('liip_imagine.cache.resolver.default', $config['cache']);
 
-        $container->setParameter('liip_imagine.filter_sets', $config['filter_sets']);
+        $container->setParameter('liip_imagine.default_image', $config['default_image']);
 
+        $container->setParameter('liip_imagine.filter_sets', $config['filter_sets']);
         $container->setParameter('liip_imagine.binary.loader.default', $config['data_loader']);
 
-        $container->setParameter('liip_imagine.controller_action', $config['controller_action']);
+        $container->setParameter('liip_imagine.controller.filter_action', $config['controller']['filter_action']);
+        $container->setParameter('liip_imagine.controller.filter_runtime_action', $config['controller']['filter_runtime_action']);
 
         $resources = $container->hasParameter('twig.form.resources') ? $container->getParameter('twig.form.resources') : array();
         $resources[] = 'LiipImagineBundle:Form:form_div_layout.html.twig';
